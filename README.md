@@ -3,6 +3,17 @@
 iOS ve Android hedefli, Unity ile geliştirilen özgün bir 3D sonsuz savunma prototipi.
 Bu ilk sürüm mağazaya hazır veya yayımlanmış bir oyun değildir.
 
+## Güncel durum (25 Ekim 2026)
+
+- Editörde oynanabilir: başlangıç, oyun, duraklatma, geliştirme seçimi, titan dalgası, oyun sonu ve yeniden başlatma akışları çalışıyor.
+- Çekirdek simülasyon testleri: **16/16 geçti** (`bash Scripts/verify.sh`).
+- Editör duman testi: **PASS** — ateş, duraklatma, yükseltme, boss, oyun sonu ve yeniden başlatma doğrulandı (`Evidence/runtime-verification.txt`).
+- Kapı çarpanları ve hasar yazıları ekran-uzayı UI olarak çiziliyor; TextMesh font atlası bozulması giderildi.
+- Kalabalık yoğunluğu ve titan ölçeği referans videoya yaklaştırıldı, kamera oyuncunun arkasına alındı.
+- **Bilinen engel:** Bu Mac'te standalone oyuncu derlemesi `Library/PlayerDataCache/.../unity_builtin_extra` yazımında başarısız oluyor; Android/iOS Build Support modülleri de kurulu değil. Bu nedenle APK/AAB/IPA üretilmedi.
+- Editör Game view ekran yakalaması bu makinede döşemeli (tiled) çıkıyor; bu bir yakalama/GUI artefaktı, oyun mantığı değil. Depoda yalnızca doğrulama metni tutuluyor.
+
+
 ## Aç ve oyna
 
 1. Unity **6.3 LTS / 6000.3.27f1** ile bu klasörü proje olarak aç.

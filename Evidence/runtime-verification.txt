@@ -1,0 +1,1 @@
+PASS: boot, firing, pause, upgrade, boss, game over, retry; no runtime errors.

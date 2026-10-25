@@ -102,7 +102,7 @@ namespace Gatefall.Core
         {
             State = RunState.Playing;
             spawnTimer = 0; fireTimer = 0; waveTime = 0; spawned = 0;
-            spawnBudget = IsBossWave ? 1 : Math.Min(38, 8 + Wave * 2);
+            spawnBudget = IsBossWave ? 1 : Math.Min(42, 12 + Wave * 2);
             shots.Clear(); choices.Clear();
             gates[0].Multiplier = Wave >= 8 ? 3 : 2;
             gates[1].Multiplier = Wave >= 8 ? 4 : 3;
@@ -142,7 +142,7 @@ namespace Gatefall.Core
             {
                 SpawnEnemy();
                 spawned++;
-                spawnTimer += Math.Max(.22f, .85f - Wave * .022f);
+                spawnTimer += Math.Max(.3f, .7f - Wave * .018f);
             }
 
             float rate = Finite(FireRate) ? Clamp(FireRate, 0, 18) : 0;
@@ -250,7 +250,7 @@ namespace Gatefall.Core
             var enemy = new Enemy
             {
                 Id = ++nextId, Kind = kind, X = kind == EnemyKind.Boss ? 0 : ((float)random.NextDouble() * 6.3f - 3.15f),
-                Z = kind == EnemyKind.Boss ? 24 : 22 + (float)random.NextDouble() * 2,
+                Z = kind == EnemyKind.Boss ? 21.5f : 22 + (float)random.NextDouble() * 2,
                 Health = health, MaxHealth = health, AttackTimer = 5,
                 Speed = kind == EnemyKind.Boss ? .65f : Math.Min(2.8f, .95f + Wave * .045f) * (kind == EnemyKind.Runner ? 1.65f : kind == EnemyKind.Tank ? .65f : 1),
                 Radius = kind == EnemyKind.Boss ? 1.5f : kind == EnemyKind.Tank ? .52f : .32f

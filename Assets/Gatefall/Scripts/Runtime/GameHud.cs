@@ -31,6 +31,18 @@ namespace Gatefall
         private Rect lastSafe, lastCamera;
         private Vector2 lastScreen;
         private readonly List<RaycastResult> pointerHits = new List<RaycastResult>();
+        private Canvas worldCanvas;
+        private readonly Text[] gateTexts = new Text[2];
+        private readonly List<WorldPopup> popups = new List<WorldPopup>(18);
+        private float hitPopupCooldown;
+
+        private sealed class WorldPopup
+        {
+            public Text Label;
+            public Vector3 World;
+            public float Age, Life;
+            public Color Tint;
+        }
 
         public void Build(GameRoot owner)
         {
@@ -48,8 +60,108 @@ namespace Gatefall
 
             viewport = Rect("Portrait viewport", transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             safe = Rect("Safe area", viewport, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            BuildWorldLabels();
             BuildLive(); BuildTitle(); BuildPause(); BuildUpgrade(); BuildGameOver();
             Render();
+        }
+
+        private void BuildWorldLabels()
+        {
+            var root = new GameObject("World labels", typeof(RectTransform));
+            // A root overlay canvas; nesting it under the HUD canvas would break its screen layout.
+            root.transform.SetParent(transform.parent, false);
+            worldCanvas = root.AddComponent<Canvas>();
+            worldCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            worldCanvas.sortingOrder = 5;
+            for (int i = 0; i < 2; i++)
+            {
+                gateTexts[i] = WorldText(root.transform, 30);
+                gateTexts[i].enabled = false;
+            }
+            for (int i = 0; i < 18; i++)
+            {
+                var popup = new WorldPopup { Label = WorldText(root.transform, 26) };
+                popup.Label.gameObject.SetActive(false);
+                popups.Add(popup);
+            }
+        }
+
+        private Text WorldText(Transform parent, int size)
+        {
+            var rect = new GameObject("World text", typeof(RectTransform)).GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.anchorMin = rect.anchorMax = Vector2.zero;
+            rect.pivot = new Vector2(.5f, .5f);
+            rect.sizeDelta = new Vector2(180, 60);
+            var label = rect.gameObject.AddComponent<Text>();
+            label.font = font; label.fontSize = size; label.fontStyle = FontStyle.Bold;
+            label.alignment = TextAnchor.MiddleCenter; label.color = Color.white;
+            label.horizontalOverflow = HorizontalWrapMode.Overflow;
+            label.verticalOverflow = VerticalWrapMode.Overflow;
+            label.raycastTarget = false;
+            var shadow = rect.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0, 0, 0, .55f);
+            shadow.effectDistance = new Vector2(1.5f, -1.5f);
+            return label;
+        }
+
+        public void React(GameEvent message)
+        {
+            if (message.Kind == GameEventKind.Hit)
+            {
+                if (hitPopupCooldown > 0) return;
+                hitPopupCooldown = .12f;
+                ShowPopup(message.Value.ToString(), new Vector3(message.X, 1.6f, message.Z), new Color32(255, 220, 120, 255), 26);
+            }
+            else if (message.Kind == GameEventKind.Eliminated)
+                ShowPopup("+" + message.Value, new Vector3(message.X, 1.25f, message.Z), Cyan, 26);
+            else if (message.Kind == GameEventKind.BaseHit)
+                ShowPopup("SAVUNMA −" + message.Value, new Vector3(message.X, 1.2f, .2f), Coral, 28);
+            else if (message.Kind == GameEventKind.GateCrossed)
+                ShowPopup("×" + message.Value, new Vector3(message.X, 2.35f, message.Z), new Color32(218, 150, 255, 255), 32);
+        }
+
+        private void ShowPopup(string text, Vector3 world, Color tint, int size)
+        {
+            WorldPopup chosen = null;
+            foreach (var popup in popups)
+                if (!popup.Label.gameObject.activeSelf) { chosen = popup; break; }
+            if (chosen == null)
+            {
+                chosen = popups[0];
+                foreach (var popup in popups) if (popup.Age > chosen.Age) chosen = popup;
+            }
+            chosen.Label.gameObject.SetActive(true);
+            chosen.Label.text = text; chosen.Label.fontSize = size;
+            chosen.Label.color = tint; chosen.World = world;
+            chosen.Age = 0; chosen.Life = .8f; chosen.Tint = tint;
+        }
+
+        private void RenderWorldLabels(GameSession session, float dt)
+        {
+            Camera camera = game.Arena.GameCamera;
+            hitPopupCooldown = Mathf.Max(0, hitPopupCooldown - dt);
+            if (gateTexts[0] == null) return;
+            for (int i = 0; i < 2 && i < session.Gates.Count; i++)
+            {
+                Gate gate = session.Gates[i];
+                gateTexts[i].text = "×" + gate.Multiplier;
+                Vector3 point = camera.WorldToScreenPoint(new Vector3(gate.X, 2.15f, gate.Z));
+                gateTexts[i].rectTransform.anchoredPosition = new Vector2(point.x, point.y);
+                gateTexts[i].enabled = point.z > 0;
+            }
+            foreach (var popup in popups)
+            {
+                if (!popup.Label.gameObject.activeSelf) continue;
+                popup.Age += dt;
+                if (popup.Age >= popup.Life) { popup.Label.gameObject.SetActive(false); continue; }
+                popup.World += Vector3.up * dt * 1.1f;
+                Vector3 point = camera.WorldToScreenPoint(popup.World);
+                popup.Label.rectTransform.anchoredPosition = new Vector2(point.x, point.y);
+                popup.Label.enabled = point.z > 0;
+                Color color = popup.Tint; color.a = 1 - popup.Age / popup.Life;
+                popup.Label.color = color;
+            }
         }
 
         private void BuildLive()
@@ -150,6 +262,9 @@ namespace Gatefall
             float top = Mathf.Clamp01((safeArea.yMax - pixels.yMin) / pixels.height);
             safe.anchorMin = new Vector2(left, bottom); safe.anchorMax = new Vector2(right, top);
             safe.offsetMin = Vector2.zero; safe.offsetMax = Vector2.zero;
+            // Overlay canvas render targets can keep the pre-resize size on Metal; rebuild them.
+            canvas.enabled = false; canvas.enabled = true;
+            if (worldCanvas != null) { worldCanvas.enabled = false; worldCanvas.enabled = true; }
         }
 
         public bool BlocksPointer(Vector2 position, int pointerId)
@@ -183,6 +298,7 @@ namespace Gatefall
             bossPanel.SetActive(boss != null);
             if (boss != null)
             { bossHealth.text = "TİTAN  ·  " + Mathf.CeilToInt(boss.Health) + " / " + Mathf.CeilToInt(boss.MaxHealth); bossFill.fillAmount = boss.Health / boss.MaxHealth; }
+            RenderWorldLabels(session, Time.unscaledDeltaTime);
             if (changed)
             {
                 renderedState = session.State;

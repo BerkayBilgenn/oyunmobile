@@ -13,3 +13,5 @@
 **/obj/
 .superpowers/
 
+Evidence/*.png
+*.log

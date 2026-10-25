@@ -68,7 +68,7 @@ namespace Gatefall.Editor
             var settings = new SerializedObject(graphics[0]);
             var shaders = settings.FindProperty("m_AlwaysIncludedShaders");
             if (shaders == null || !shaders.isArray) return;
-            foreach (string name in new[] { "Standard", "GUI/Text Shader", "UI/Default" })
+            foreach (string name in new[] { "Standard" })
             {
                 Shader shader = Shader.Find(name);
                 if (shader == null) continue;
@@ -102,7 +102,13 @@ namespace Gatefall.Editor
         public static void BuildIOS() { Build(BuildTarget.iOS, "Builds/iOS", false); }
 
         [MenuItem("Gatefall/Build/Mac prototype")]
-        public static void BuildMac() { Build(BuildTarget.StandaloneOSX, "Builds/Mac/Gatefall.app", true); }
+        public static void BuildMac()
+        {
+            // Local preview only needs Apple silicon; universal builds fail while writing
+            // built-in resources with this editor on macOS.
+            PlayerSettings.SetArchitecture(BuildTargetGroup.Standalone, 1);
+            Build(BuildTarget.StandaloneOSX, "Builds/Mac/Gatefall.app", true);
+        }
 
         private static void Build(BuildTarget target, string path, bool development)
         {
@@ -129,6 +135,15 @@ namespace Gatefall.Editor
             Prepare();
             EditorSceneManager.OpenScene(ScenePath);
             EditorApplication.isPlaying = true;
+        }
+
+        /// <summary>Opens the Game view and enters play mode for a live on-screen preview.</summary>
+        public static void PlayPreview()
+        {
+            Prepare();
+            EditorSceneManager.OpenScene(ScenePath);
+            EditorApplication.ExecuteMenuItem("Window/General/Game");
+            EditorApplication.delayCall += () => EditorApplication.isPlaying = true;
         }
     }
 }

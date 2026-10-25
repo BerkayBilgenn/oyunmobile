@@ -17,21 +17,11 @@ namespace Gatefall
         private readonly HashSet<int> seen = new HashSet<int>();
         private readonly List<int> stale = new List<int>();
         private readonly List<Material> materials = new List<Material>();
-        private readonly List<Effect> effects = new List<Effect>();
         private readonly Transform[] gateRoots = new Transform[2];
-        private readonly TextMesh[] gateLabels = new TextMesh[2];
         private Material blue, cyan, coral, dark, white, purple, orange;
         private float recoil, shake, hitTextCooldown, visualClock;
         private Vector3 cameraPosition;
         private readonly List<ActorView> preview = new List<ActorView>();
-
-        private sealed class Effect
-        {
-            public Transform Root;
-            public TextMesh Label;
-            public float Time;
-            public Vector3 Origin;
-        }
 
         public void Build()
         {
@@ -63,10 +53,10 @@ namespace Gatefall
             GameCamera = cameraObject.AddComponent<Camera>();
             cameraObject.AddComponent<AudioListener>();
             GameCamera.transform.SetParent(transform, false);
-            cameraPosition = new Vector3(0, 21, -15.8f);
+            cameraPosition = new Vector3(0, 17, -18);
             GameCamera.transform.position = cameraPosition;
-            GameCamera.transform.LookAt(new Vector3(0, 0, 10.5f));
-            GameCamera.fieldOfView = 43; GameCamera.nearClipPlane = .3f; GameCamera.farClipPlane = 180;
+            GameCamera.transform.LookAt(new Vector3(0, 1.2f, 9));
+            GameCamera.fieldOfView = 48; GameCamera.nearClipPlane = .3f; GameCamera.farClipPlane = 180;
             GameCamera.clearFlags = CameraClearFlags.SolidColor; GameCamera.backgroundColor = RenderSettings.fogColor;
 
             Part("Desert", PrimitiveType.Cube, new Vector3(0, -.6f, 30), new Vector3(180, .4f, 220), sand);
@@ -133,8 +123,6 @@ namespace Gatefall
                 }
                 ActorView.Part("Header", PrimitiveType.Cube, root, new Vector3(0, 1.93f, 0), new Vector3(2.8f, .58f, .19f), purple);
                 ActorView.Part("Threshold", PrimitiveType.Cube, root, new Vector3(0, .12f, 0), new Vector3(2.7f, .06f, .4f), purple);
-                gateLabels[i] = WorldLabel("×" + (i + 2), root, new Vector3(0, 2, -.14f), .31f, Color.white);
-                gateLabels[i].transform.rotation = GameCamera.transform.rotation;
             }
 
             actorRoot = new GameObject("Pooled actors").transform; actorRoot.SetParent(transform, false);
@@ -143,13 +131,6 @@ namespace Gatefall
                 var robot = ActorView.Robot(actorRoot, coral, dark, orange);
                 robot.Root.transform.position = new Vector3((i % 3 - 1) * 1.5f, .15f, 13 + (i / 3) * 2.5f);
                 robot.Id = i; preview.Add(robot);
-            }
-            for (int i = 0; i < 32; i++)
-            {
-                var effect = new Effect();
-                effect.Root = new GameObject("Impact feedback").transform; effect.Root.SetParent(transform, false);
-                effect.Label = WorldLabel("", effect.Root, Vector3.zero, .23f, Color.white);
-                effect.Root.gameObject.SetActive(false); effects.Add(effect);
             }
             FitCamera();
         }
@@ -188,7 +169,7 @@ namespace Gatefall
                     bool boss = enemy.Kind == EnemyKind.Boss;
                     Stack<ActorView> pool = boss ? bossPool : robotPool;
                     view = pool.Count > 0 ? pool.Pop() : ActorView.Robot(actorRoot, coral, dark, orange, boss);
-                    view.Id = enemy.Id; view.BaseScale = Vector3.one * (boss ? 4.2f : enemy.Kind == EnemyKind.Tank ? 1.35f : enemy.Kind == EnemyKind.Runner ? .78f : 1);
+                    view.Id = enemy.Id; view.BaseScale = Vector3.one * (boss ? 8.5f : enemy.Kind == EnemyKind.Tank ? 1.5f : enemy.Kind == EnemyKind.Runner ? .9f : 1.2f);
                     view.Root.SetActive(true); enemyViews.Add(enemy.Id, view);
                 }
                 view.Root.transform.position = new Vector3(enemy.X, .13f, enemy.Z);
@@ -211,6 +192,7 @@ namespace Gatefall
                 {
                     view = scoutPool.Count > 0 ? scoutPool.Pop() : ActorView.Scout(actorRoot, blue, cyan);
                     view.Id = shot.Id; view.Root.SetActive(true); shotViews.Add(shot.Id, view);
+                    view.Root.transform.localScale = Vector3.one * 1.45f;
                 }
                 view.Root.transform.position = new Vector3(shot.X, .12f + Mathf.Sin(visualClock * 25 + shot.Id) * .04f, shot.Z);
             }
@@ -220,48 +202,22 @@ namespace Gatefall
             { var view = shotViews[id]; view.Root.SetActive(false); scoutPool.Push(view); shotViews.Remove(id); }
 
             for (int i = 0; i < 2; i++)
-            { gateRoots[i].position = new Vector3(game.Gates[i].X, 0, game.Gates[i].Z); gateLabels[i].text = "×" + game.Gates[i].Multiplier; }
-            foreach (Effect effect in effects)
-            {
-                if (!effect.Root.gameObject.activeSelf) continue;
-                effect.Time -= dt;
-                if (effect.Time <= 0) { effect.Root.gameObject.SetActive(false); continue; }
-                effect.Root.position = effect.Origin + Vector3.up * (1 - effect.Time) * .8f;
-                Color color = effect.Label.color; color.a = Mathf.Min(1, effect.Time * 3); effect.Label.color = color;
-            }
+                gateRoots[i].position = new Vector3(game.Gates[i].X, 0, game.Gates[i].Z);
         }
 
         public void React(GameEvent message)
         {
             if (message.Kind == GameEventKind.Shot) recoil = 1;
-            if (message.Kind == GameEventKind.BaseHit) { shake = 1; Popup("SAVUNMA −" + message.Value, new Vector3(message.X, 1.6f, .3f), new Color(1, .25f, .3f)); }
-            if (message.Kind == GameEventKind.Eliminated) Popup("+" + message.Value, new Vector3(message.X, 1.1f, message.Z), new Color(.5f, 1, 1));
+            if (message.Kind == GameEventKind.BaseHit) shake = 1;
             if (message.Kind == GameEventKind.Hit && hitTextCooldown <= 0)
             {
-                Popup(message.Value.ToString(), new Vector3(message.X, 1.5f, message.Z), new Color(1, .85f, .4f));
                 hitTextCooldown = .14f;
                 foreach (var view in enemyViews.Values)
                     if (Mathf.Abs(view.Root.transform.position.z - message.Z) < 1) view.Flash = 1;
             }
         }
 
-        public void ResetEffects()
-        {
-            foreach (var effect in effects) effect.Root.gameObject.SetActive(false);
-            recoil = 0; shake = 0;
-        }
-
-        private void Popup(string text, Vector3 point, Color color)
-        {
-            foreach (Effect effect in effects)
-            {
-                if (effect.Root.gameObject.activeSelf) continue;
-                effect.Time = .85f; effect.Origin = point; effect.Root.position = point;
-                effect.Label.text = text; effect.Label.color = color;
-                effect.Root.rotation = GameCamera.transform.rotation;
-                effect.Root.gameObject.SetActive(true); break;
-            }
-        }
+        public void ResetEffects() { recoil = 0; shake = 0; }
 
         private Transform Part(string name, PrimitiveType type, Vector3 position, Vector3 scale, Material material)
         { return ActorView.Part(name, type, transform, position, scale, material); }
@@ -279,19 +235,6 @@ namespace Gatefall
             var baseRock = Part("Canyon mesa", PrimitiveType.Cylinder, position + Vector3.up * height * .35f, new Vector3(width, height * .35f, width * .8f), material);
             baseRock.rotation = Quaternion.Euler(0, position.x * 7, 0);
             Part("Mesa crown", PrimitiveType.Cylinder, position + Vector3.up * height * .8f, new Vector3(width * .67f, height * .15f, width * .54f), material);
-        }
-
-        private static TextMesh WorldLabel(string text, Transform parent, Vector3 position, float size, Color color)
-        {
-            var label = new GameObject("Label").AddComponent<TextMesh>();
-            label.transform.SetParent(parent, false); label.transform.localPosition = position;
-            label.text = text; label.fontSize = 72; label.characterSize = size;
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            label.GetComponent<MeshRenderer>().sharedMaterial = label.font.material;
-            label.anchor = TextAnchor.MiddleCenter; label.alignment = TextAlignment.Center;
-            label.fontStyle = FontStyle.Bold; label.color = color;
-            label.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
-            return label;
         }
 
         private void OnDestroy() { foreach (var material in materials) if (material != null) Destroy(material); }

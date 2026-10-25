@@ -14,6 +14,8 @@ namespace Gatefall
         public bool SoundEnabled { get; private set; }
         private GameAudio gameAudio;
         private float accumulator, targetX;
+        /// <summary>Smoke verification advances the session itself so a slow editor cannot distort the run.</summary>
+        public bool ManualStep;
         private bool dragging;
         private int pointerId = -1;
         private RunState previousState;
@@ -70,7 +72,7 @@ namespace Gatefall
             Arena.FitCamera(); Hud.FitSafeArea(Arena.GameCamera.rect);
             if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P)) TogglePause();
             ReadInput();
-            if (Session.State == RunState.Playing)
+            if (Session.State == RunState.Playing && !ManualStep)
             {
                 float step = 1f / 60f;
                 accumulator += Mathf.Min(Time.unscaledDeltaTime, .2f);
@@ -81,6 +83,7 @@ namespace Gatefall
                     foreach (var message in Session.Events)
                     {
                         Arena.React(message);
+                        Hud.React(message);
                         if (SoundEnabled) gameAudio.Play(message);
                     }
                     Session.ClearEvents();
