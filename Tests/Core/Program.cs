@@ -16,6 +16,8 @@ internal static class Program
         Check("The fifth wave is a boss and rewards only after its death", BossSchedule);
         Check("Crossing a gate multiplies shots once", GateMultiplication);
         Check("Fast projectiles still hit enemies between frames", SweptCollision);
+        Check("An enemy before a gate stops a shot before it can multiply", EnemyBeforeGate);
+        Check("Firing cadence matches the selected rate over one second", FireCadence);
         Check("A breached defense line removes health and ends the run", Breach);
         Check("An invalid upgrade cannot resume or modify the run", InvalidUpgrade);
         Check("An upgrade applies exactly once and resumes the next wave", Upgrade);
@@ -167,6 +169,32 @@ internal static class Program
         float elapsed = game.Elapsed;
         Advance(game, 1);
         Assert(game.Elapsed == elapsed, "Game over kept running");
+    }
+
+    private static void EnemyBeforeGate()
+    {
+        var game = NewGame();
+        game.FireRate = 0;
+        game.Advance(1f / 60f);
+        Enemy target = game.Enemies[0];
+        target.X = game.Gates[1].X; target.Z = 5.35f; target.Radius = .32f; target.Speed = 0;
+        game.Move(target.X);
+        game.FireRate = 1; game.ProjectileSpeed = 30;
+        game.Advance(1f / 60f);
+        Shot shot = game.Shots[0];
+        shot.Z = 5; shot.X = target.X;
+        game.Advance(1f / 60f);
+        Assert(game.MultipliedShots == 0 && game.Shots.Count == 0, "A blocked shot produced units beyond the gate");
+        Assert(target.Health == target.MaxHealth - 1, "The earlier target was not hit");
+    }
+
+    private static void FireCadence()
+    {
+        var game = NewGame(); game.FireRate = 18;
+        game.Advance(1);
+        int fired = 0;
+        foreach (GameEvent message in game.Events) if (message.Kind == GameEventKind.Shot) fired++;
+        Assert(fired == 18, "Expected 18 volleys in one second, saw " + fired);
     }
 
     private static void InvalidUpgrade()

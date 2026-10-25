@@ -145,16 +145,16 @@ namespace Gatefall.Core
                 spawnTimer += Math.Max(.22f, .85f - Wave * .022f);
             }
 
-            fireTimer -= dt;
             float rate = Finite(FireRate) ? Clamp(FireRate, 0, 18) : 0;
             if (rate > 0 && fireTimer <= 0)
             {
                 int count = Math.Max(1, Math.Min(5, MultiShot));
                 for (int i = 0; i < count; i++) AddShot(CannonX + (i - (count - 1) * .5f) * .22f, .7f, 0);
-                fireTimer = 1f / rate;
+                fireTimer += 1f / rate;
                 Emit(GameEventKind.Shot, CannonX, .7f);
             }
             else if (rate == 0) fireTimer = 0;
+            if (rate > 0) fireTimer -= dt;
 
             for (int i = enemies.Count - 1; i >= 0; i--)
             {
@@ -183,11 +183,21 @@ namespace Gatefall.Core
                 shot.PreviousZ = shot.Z;
                 float speed = Finite(ProjectileSpeed) ? Clamp(ProjectileSpeed, 1, 1000) : 16;
                 shot.Z += speed * dt;
+                int hit = -1; float nearestContact = float.MaxValue;
+                for (int j = 0; j < enemies.Count; j++)
+                {
+                    Enemy enemy = enemies[j];
+                    if (Math.Abs(enemy.X - shot.X) > enemy.Radius + .12f) continue;
+                    float contact = Math.Max(shot.PreviousZ, enemy.Z - enemy.Radius);
+                    if (shot.PreviousZ <= enemy.Z + enemy.Radius && shot.Z >= contact && contact < nearestContact)
+                    { hit = j; nearestContact = contact; }
+                }
                 if (shot.Amplifications == 0)
                 {
                     foreach (Gate gate in gates)
                     {
-                        if (shot.PreviousZ < gate.Z && shot.Z >= gate.Z && Math.Abs(shot.X - gate.X) <= gate.Width * .5f)
+                        if (shot.PreviousZ < gate.Z && shot.Z >= gate.Z && gate.Z < nearestContact
+                            && Math.Abs(shot.X - gate.X) <= gate.Width * .5f)
                         {
                             shot.Amplifications = 1;
                             for (int n = 1; n < gate.Multiplier; n++)
@@ -202,14 +212,6 @@ namespace Gatefall.Core
                     }
                 }
 
-                int hit = -1; float nearest = float.MaxValue;
-                for (int j = 0; j < enemies.Count; j++)
-                {
-                    Enemy enemy = enemies[j];
-                    if (Math.Abs(enemy.X - shot.X) > enemy.Radius + .12f) continue;
-                    if (shot.PreviousZ <= enemy.Z + enemy.Radius && shot.Z >= enemy.Z - enemy.Radius && enemy.Z < nearest)
-                    { hit = j; nearest = enemy.Z; }
-                }
                 if (hit >= 0)
                 {
                     Enemy enemy = enemies[hit];
